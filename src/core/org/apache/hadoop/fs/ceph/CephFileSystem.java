@@ -443,6 +443,40 @@ public class CephFileSystem extends FileSystem {
   }
 
   /**
+  * Opens an FSDataOutputStream at the indicated Path with write-progress
+  * reporting. Same as create(), except fails if parent directory doesn't
+  * already exist.
+  * @param f the file name to open
+  * @param permission
+  * @param overwrite if a file with this name already exists, then if true,
+  * the file will be overwritten, and if false an error will be thrown.
+  * @param bufferSize the size of the buffer to be used.
+  * @param replication required block replication for the file.
+  * @param blockSize
+  * @param progress
+  * @throws IOException
+  * @see #setPermission(Path, FsPermission)
+  * @deprecated API only for 0.20-append
+  */
+  @Deprecated
+  public FSDataOutputStream createNonRecursive(Path path, FsPermission permission,
+      boolean overwrite,
+      int bufferSize, short replication, long blockSize,
+      Progressable progress) throws IOException {
+
+    path = makeAbsolute(path);
+
+    Path parent = path.getParent();
+
+    if (parent != null)
+      if (!exists(parent))
+        throw new IOException("parent " + parent.toString() + " does not exist.");
+
+    return this.create(path, permission, overwrite,
+        bufferSize, replication, blockSize, progress);
+  }
+
+  /**
    * Rename a file or directory.
    * @param src The current path of the file/directory
    * @param dst The new name for the path.
