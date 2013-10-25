@@ -24,12 +24,15 @@ package org.apache.hadoop.fs.ceph;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.InetAddress;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.Configuration;
 
 import com.ceph.fs.CephStat;
 import com.ceph.fs.CephPoolException;
+import com.ceph.crush.Bucket;
+import com.ceph.fs.CephFileExtent;
 
 abstract class CephFS {
 
@@ -58,4 +61,7 @@ abstract class CephFS {
   abstract String get_file_pool_name(int fd);
   abstract int get_pool_id(String pool_name) throws IOException;;
   abstract int get_pool_replication(int poolid) throws IOException;
+  abstract InetAddress get_osd_address(int osd) throws IOException;
+  abstract Bucket[] get_osd_crush_location(int osd) throws IOException;
+  abstract CephFileExtent get_file_extent(int fd, long offset) throws IOException;
 }

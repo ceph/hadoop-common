@@ -52,6 +52,8 @@ import com.ceph.fs.CephFileAlreadyExistsException;
 import com.ceph.fs.CephNotDirectoryException;
 import com.ceph.fs.CephMount;
 import com.ceph.fs.CephStat;
+import com.ceph.crush.Bucket;
+import com.ceph.fs.CephFileExtent;
 
 
 /**
@@ -511,10 +513,6 @@ public class CephFileSystem extends FileSystem {
   /**
    * Get a BlockLocation object for each block in a file.
    *
-   * Note that this doesn't include port numbers in the name field as
-   * Ceph handles slow/down servers internally. This data should be used
-   * only for selecting which servers to run which jobs on.
-   *
    * @param file A FileStatus object corresponding to the file you want locations for.
    * @param start The offset of the first part of the file you are interested in.
    * @param len The amount of the file past the offset you are interested in.
@@ -531,21 +529,49 @@ public class CephFileSystem extends FileSystem {
       return null;
     }
 
-    /* Get block size */
-    CephStat stat = new CephStat();
-    ceph.fstat(fh, stat);
-    long blockSize = stat.blksize;
+    ArrayList<BlockLocation> blocks = new ArrayList<BlockLocation>();
 
-    BlockLocation[] locations = new BlockLocation[(int) Math.ceil(len / (float) blockSize)];
+    long curPos = start;
+    long endOff = curPos + len;
+    do {
+      CephFileExtent extent = ceph.get_file_extent(fh, curPos);
 
-    for (int i = 0; i < locations.length; ++i) {
-      long offset = start + i * blockSize;
-      long blockStart = start + i * blockSize - (start % blockSize);
-      locations[i] = new BlockLocation(null, null, blockStart, blockSize);
-      LOG.debug("getFileBlockLocations: location[" + i + "]: " + locations[i]);
-    }
+      int[] osds = extent.getOSDs();
+      String[] names = new String[osds.length];
+      String[] hosts = new String[osds.length];
+      String[] racks = new String[osds.length];
+
+      for (int i = 0; i < osds.length; i++) {
+        InetAddress addr = ceph.get_osd_address(osds[i]);
+        names[i] = addr.getHostAddress();
+
+        /*
+         * Grab the hostname and rack from the crush hierarchy. Current we
+         * hard code the item types. For a more general treatment, we'll need
+         * a new configuration option that allows users to map their custom
+         * crush types to hosts and topology.
+         */
+        Bucket[] path = ceph.get_osd_crush_location(osds[i]);
+        for (Bucket bucket : path) {
+          String type = bucket.getType();
+          if (type.compareTo("host") == 0)
+            hosts[i] = bucket.getName();
+          else if (type.compareTo("rack") == 0)
+            racks[i] = bucket.getName();
+        }
+      }
+
+      blocks.add(new BlockLocation(names, hosts, racks,
+            extent.getOffset(), extent.getLength()));
+
+      curPos += extent.getLength();
+    } while(curPos < endOff);
 
     ceph.close(fh);
+
+    BlockLocation[] locations = new BlockLocation[blocks.size()];
+    locations = blocks.toArray(locations);
+
     return locations;
   }
 

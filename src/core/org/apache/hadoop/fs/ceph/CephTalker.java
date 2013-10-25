@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.io.FileNotFoundException;
 import java.util.Arrays;
+import java.net.InetAddress;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.Configuration;
@@ -35,6 +36,8 @@ import com.ceph.fs.CephStat;
 import com.ceph.fs.CephFileAlreadyExistsException;
 import com.ceph.fs.CephNotDirectoryException;
 import com.ceph.fs.CephPoolException;
+import com.ceph.crush.Bucket;
+import com.ceph.fs.CephFileExtent;
 
 class CephTalker extends CephFS {
 
@@ -296,5 +299,17 @@ class CephTalker extends CephFS {
     } catch (CephPoolException e) {
       throw new IOException();
     }
+  }
+
+  InetAddress get_osd_address(int osd) throws IOException {
+    return mount.get_osd_address(osd);
+  }
+
+  Bucket[] get_osd_crush_location(int osd) throws IOException {
+    return mount.get_osd_crush_location(osd);
+  }
+
+  CephFileExtent get_file_extent(int fd, long offset) throws IOException {
+    return mount.get_file_extent(fd, offset);
   }
 }
